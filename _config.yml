@@ -23,8 +23,8 @@ author:
   avatar: /assets/img/avatar.jpg # change with your own avatar
 
 # URL settings
-url: "https://dexter.github.io" #
-baseurl:
+url: "https://ahmedg113.github.io" #
+baseurl: "/dexter.github.io"
 permalink: /:title/
 google_analytics: # leave it blank if not wish
 fb_appid:
