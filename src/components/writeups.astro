@@ -3,6 +3,7 @@
 interface Writeup {
   title: string;
   platform: string;
+  type: string;
   difficulty: string;
   date: string;
   link: string;
@@ -10,15 +11,17 @@ interface Writeup {
 
 const writeups: Writeup[] = [
   {
-    title: "Writeup One",
+    title: "CCTV",
     platform: "Hack The Box",
+    type: "Machine",
     difficulty: "Easy",
     date: "Oct 2026",
-    link: "https://example.com",
+    link: "/writeups/cctv/",
   },
   {
     title: "Writeup Two",
     platform: "Hack The Box",
+    type: "Machine",
     difficulty: "Medium",
     date: "Oct 2026",
     link: "https://example.com",
@@ -26,6 +29,7 @@ const writeups: Writeup[] = [
   {
     title: "Writeup Three",
     platform: "TryHackMe",
+    type: "Room",
     difficulty: "Easy",
     date: "Sep 2026",
     link: "https://example.com",
@@ -33,6 +37,7 @@ const writeups: Writeup[] = [
   {
     title: "Writeup Four",
     platform: "TryHackMe",
+    type: "Room",
     difficulty: "Hard",
     date: "Sep 2026",
     link: "https://example.com",
@@ -67,6 +72,10 @@ const difficultyColor: Record<string, string> = {
               <div class="flex items-center gap-3 mb-2">
                 <span class="text-sm text-[var(--white-icon)]">
                   {writeup.platform}
+                </span>
+                <span class="text-sm text-[var(--white-icon)]">•</span>
+                <span class="text-sm text-[var(--white-icon)]">
+                  {writeup.type}
                 </span>
                 <span class="text-sm text-[var(--white-icon)]">•</span>
                 <span

