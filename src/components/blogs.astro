@@ -6,16 +6,18 @@ interface Post {
   date: string;
   tags: string[];
   link: string;
+  image?: string;
 }
 
 const posts: Post[] = [
   {
-    title: "Blog Post One",
+    title: "Python Pickle: When Cookies Execute Code",
     excerpt:
-      "A short excerpt of the blog post goes here. Replace it with a summary of the topic you covered.",
-    date: "Oct 9, 2026",
-    tags: ["Security", "Web"],
-    link: "https://example.com",
+      "A session cookie that turned out to be a serialized Python object — how to spot Pickle cookies, why they can be dangerous, and how __reduce__() turns untrusted data into code execution.",
+    date: "Aug 25, 2026",
+    tags: ["Python", "Deserialization", "Web Security"],
+    link: "/blogs/python-pickle/",
+    image: "/images/python-pickle/intro.gif",
   },
   {
     title: "Blog Post Two",
@@ -49,33 +51,45 @@ const posts: Post[] = [
         posts.map((post) => (
           <a
             href={post.link}
-            target="_blank"
+            target={post.link.startsWith("/") ? undefined : "_blank"}
             rel="noopener noreferrer"
             class="group rounded-2xl p-6 border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] hover:bg-[var(--white-icon-tr)] transition duration-300 ease-in-out"
           >
-            <div class="flex flex-wrap items-center gap-3 mb-2">
-              <span class="text-sm text-[var(--white-icon)]">{post.date}</span>
-              {post.tags.map((tag) => (
-                <span class="text-xs px-2 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] text-[var(--white-icon)]">
-                  {tag}
+            <div class="flex items-center gap-6">
+              <div class="flex-grow min-w-0">
+                <div class="flex flex-wrap items-center gap-3 mb-2">
+                  <span class="text-sm text-[var(--white-icon)]">{post.date}</span>
+                  {post.tags.map((tag) => (
+                    <span class="text-xs px-2 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] text-[var(--white-icon)]">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <h4 class="text-2xl font-semibold mb-2 group-hover:text-white transition-colors">
+                  {post.title}
+                </h4>
+                <p class="text-[var(--white-icon)]">{post.excerpt}</p>
+                <span class="inline-flex items-center gap-2 mt-4 text-[var(--sec)]">
+                  Read more
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    class="size-4 group-hover:translate-x-1 transition-transform duration-300"
+                  >
+                    <path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z" />
+                  </svg>
                 </span>
-              ))}
+              </div>
+              {post.image && (
+                <img
+                  src={post.image}
+                  alt={post.title}
+                  class="hidden md:block w-40 h-40 lg:w-48 lg:h-48 object-cover rounded-2xl border border-1 border-[var(--white-icon-tr)] flex-shrink-0"
+                  loading="lazy"
+                />
+              )}
             </div>
-            <h4 class="text-2xl font-semibold mb-2 group-hover:text-white transition-colors">
-              {post.title}
-            </h4>
-            <p class="text-[var(--white-icon)]">{post.excerpt}</p>
-            <span class="inline-flex items-center gap-2 mt-4 text-[var(--sec)]">
-              Read more
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                class="size-4 group-hover:translate-x-1 transition-transform duration-300"
-              >
-                <path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z" />
-              </svg>
-            </span>
           </a>
         ))
       }

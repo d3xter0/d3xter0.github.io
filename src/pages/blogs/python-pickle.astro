@@ -1,0 +1,362 @@
+---
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="Python Pickle: When Cookies Execute Code">
+  <main class="max-w-3xl mx-auto py-16 text-[var(--white)]">
+    <a
+      href="/#blogs"
+      class="inline-flex items-center gap-2 text-sm text-[var(--white-icon)] hover:text-white transition-colors mb-8"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        class="size-4"
+      >
+        <path d="M7.82843 10.9999H20V12.9999H7.82843L13.1924 18.3638L11.7782 19.778L4 11.9999L11.7782 4.22168L13.1924 5.63589L7.82843 10.9999Z"
+        ></path>
+      </svg>
+      Back to blogs
+    </a>
+
+    <header class="mb-10">
+      <div class="flex flex-wrap items-center gap-3 mb-3 text-sm">
+        <span class="px-3 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[var(--sec)]">
+          Python
+        </span>
+        <span class="px-3 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[var(--white-icon)]">
+          Deserialization
+        </span>
+        <span class="px-3 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[var(--white-icon)]">
+          Web Security
+        </span>
+        <span class="text-[var(--white-icon)]">Aug 2026</span>
+      </div>
+      <h1 class="text-4xl md:text-5xl font-semibold mb-3">
+        Python Pickle: When Cookies Execute Code
+      </h1>
+      <p class="text-[var(--white-icon)]">
+        How a suspicious-looking session cookie turned out to be a serialized
+        Python object — and why unpickling untrusted data can lead to code
+        execution.
+      </p>
+    </header>
+
+    <article class="writeup space-y-5">
+      <p>
+        While testing a web app’s authentication, I found a session cookie
+        that looked… off:
+      </p>
+      <pre><code>gAWVjwAAAAAAAAB9lCiMCHVzZXJuYW1l...</code></pre>
+      <p>
+        At first glance it seemed like a random token. But once I decoded it,
+        I realized it wasn’t random at all; it was a
+        <strong>Python Pickle object</strong>. And that made this cookie a lot
+        more interesting than a normal session ID.
+      </p>
+
+      <figure class="flex justify-center my-8">
+        <img src="/images/python-pickle/intro.gif" alt="" class="rounded-xl" width="466" />
+      </figure>
+
+      <h2>What Is Pickle, Anyway?</h2>
+      <p>
+        If you’ve worked with Python, you’ve probably used pickle before. It's
+        Python's built-in way to turn objects into bytes so they can be saved
+        or sent somewhere and turned back into objects later.
+      </p>
+      <pre><code>import pickle
+session = {'{'}
+    "username": "user",
+    "role": "user",
+    "is_authenticated": True
+{'}'}
+
+# Object -&gt; bytes
+data = pickle.dumps(session)
+
+# bytes -&gt; Object
+restored = pickle.loads(data)
+print(restored)</code></pre>
+      <p>Simple and convenient. But there’s a well-known warning that comes with it:</p>
+      <p class="border-l-4 border-[var(--sec)] pl-4 italic text-white">
+        Never unpickle data you don’t trust.
+      </p>
+      <p>
+        Pickle was never built to be a safe format for untrusted input and
+        we’ll see exactly why in a bit.
+      </p>
+
+      <h2>How I Spotted the Pickle</h2>
+      <p>
+        The cookie started with <code>gAWV</code>, which was my first hint.
+        Cookies are usually Base64-encoded, so I decoded it:
+      </p>
+      <pre><code>echo 'COOKIE_VALUE' | base64 -d &gt; session.pkl</code></pre>
+      <p>Then checked the raw bytes:</p>
+      <pre><code>xxd session.pkl</code></pre>
+      <p>
+        The header matched a Pickle protocol signature, a strong sign this was
+        a serialized Python object.
+      </p>
+      <figure>
+        <img
+          src="/images/python-pickle/xxd.png"
+          alt="xxd output showing the Pickle signature"
+          class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+        />
+        <figcaption class="text-center text-sm text-[var(--white-icon)] mt-2">
+          The raw bytes revealing the Pickle protocol signature
+        </figcaption>
+      </figure>
+      <p>
+        Instead of jumping straight to <code>pickle.loads()</code> (which
+        would actually execute whatever is inside), I used
+        <code>pickletools</code> to safely inspect the structure without
+        deserializing it:
+      </p>
+      <pre><code>python3 -m pickletools session.pkl</code></pre>
+      <p>
+        This is the safer move whenever your goal is just to understand what’s
+        inside a pickle stream, not run it.
+      </p>
+
+      <h2>What Was Actually Inside</h2>
+      <figure>
+        <img
+          src="/images/python-pickle/pickletools1.png"
+          alt="pickletools disassembly output"
+          class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+        />
+        <figcaption class="text-center text-sm text-[var(--white-icon)] mt-2">
+          Disassembling the pickle stream safely with pickletools
+        </figcaption>
+      </figure>
+      <figure>
+        <img
+          src="/images/python-pickle/pickletools2.png"
+          alt="pickletools disassembly output continued"
+          class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+        />
+      </figure>
+      <p>The disassembled output pointed to something like this object:</p>
+      <pre><code>{'{'}
+    "username": "user",
+    "role": "user",
+    "is_authenticated": True,
+    "created_at": "...",   # datetime
+    "expires_at": "..."    # datetime
+{'}'}</code></pre>
+      <p>
+        So this wasn’t a plain <code>session_id=random_string</code> cookie,
+        it was carrying an entire serialized Python object, sent to the client
+        and back with every request.
+      </p>
+
+      <h2>Why That’s a Problem (Sometimes)</h2>
+      <p>Picture the flow:</p>
+      <pre><code>Session Object -&gt; Pickle -&gt; Base64 -&gt; Cookie</code></pre>
+      <p>
+        The browser stores that cookie and sends it back on every request. If
+        the server blindly trusts what’s inside it, an attacker could try
+        flipping:
+      </p>
+      <pre><code>"role": "user"</code></pre>
+      <p>into:</p>
+      <pre><code>"role": "admin"</code></pre>
+      <p>Classic case of never trusting client-controlled data.</p>
+      <p>
+        But finding a Pickle cookie doesn’t automatically mean the app is
+        vulnerable.
+      </p>
+
+      <h2>Serialization ≠ Insecurity</h2>
+      <p>A well-built app signs the serialized data, usually with an HMAC:</p>
+      <pre><code>Session Data + Secret Key -&gt; HMAC Signature -&gt; Signed Cookie</code></pre>
+      <p>
+        If an attacker tampers with <code>role</code>, the signature no longer
+        matches, and the server rejects the cookie.
+      </p>
+      <p>So the real question when you find something like this isn’t:</p>
+      <p class="border-l-4 border-[var(--sec)] pl-4 italic text-white">
+        “Can I decode it?”
+      </p>
+      <p>It’s:</p>
+      <p class="border-l-4 border-[var(--sec)] pl-4 italic text-white">
+        “Does the server trust this client-controlled data, and how does it
+        verify it wasn’t tampered with?”
+      </p>
+
+      <h2>The Real Danger: Code Execution, Not Just Data Tampering</h2>
+      <figure class="flex justify-center my-8">
+        <img src="/images/python-pickle/danger.gif" alt="" class="rounded-xl" width="480" />
+      </figure>
+      <p>
+        Here’s the part that makes Pickle genuinely dangerous. it’s not just a
+        data format. During deserialization, Pickle can reconstruct arbitrary
+        Python objects, which means it can also call functions as part of
+        rebuilding them.
+      </p>
+      <p>That’s why this single line is risky:</p>
+      <pre><code>pickle.loads(untrusted_data)</code></pre>
+      <p>
+        If an attacker controls the pickle bytes, they can potentially achieve
+        remote code execution. Here’s the attack flow:
+      </p>
+      <ol class="list-decimal list-inside space-y-2">
+        <li>
+          The attacker doesn’t need access to the server’s code just the
+          knowledge that the app unpickles cookie data. They build a malicious
+          Python object locally, on their own machine.
+        </li>
+        <li>
+          That object defines a <code>__reduce__()</code> method (more on this
+          below) that points to a dangerous callable, something like
+          <code>os.system</code>, <code>subprocess.Popen</code>, or
+          <code>eval</code>.
+        </li>
+        <li>
+          The attacker serializes that object with <code>pickle.dumps()</code>,
+          Base64-encodes the result, and drops it into the cookie value
+          replacing the legitimate session data.
+        </li>
+        <li>The tampered cookie is sent back to the server on the next request.</li>
+        <li>
+          If the server has no signature/HMAC check (see above) and blindly
+          runs <code>pickle.loads(cookie_value)</code>, Pickle starts
+          reconstructing the object.
+        </li>
+        <li>
+          While reconstructing it, Pickle sees the <code>__reduce__()</code>
+          instructions and calls the callable it points to with the attacker's
+          arguments. That call happens on the server, with whatever privileges
+          the server process has.
+        </li>
+      </ol>
+      <p>
+        The key detail: the malicious code doesn’t sit inside the pickle as
+        literal Python source that gets exec. Instead, the pickle bytes just
+        say <em>"to rebuild this object, call this function with these
+        arguments"</em> and <code>pickle.loads()</code> obeys that
+        instruction. That's what makes it code execution rather than simple
+        data tampering.
+      </p>
+
+      <h2>Where __reduce__( ) Comes In</h2>
+      <p>
+        The mechanism behind this is Python’s <code>__reduce__()</code>
+        method, which tells Pickle how to rebuild an object.
+      </p>
+      <pre><code>import pickle
+import os
+class Exploit:
+    def __reduce__(self):
+        return (os.system, ("echo 'Hello from Pickle!'",))
+payload = pickle.dumps(Exploit())
+pickle.loads(payload)  # runs os.system(...) during unpickling</code></pre>
+      <p>
+        When <code>pickle.loads()</code> runs, Python calls
+        <code>os.system("echo 'Hello from Pickle!'")</code> not because the
+        code was "executed" in the normal sense, but because that's literally
+        what <code>__reduce__()</code> told Pickle to do while rebuilding the
+        object.
+      </p>
+      <p>
+        <code>__reduce__()</code> itself isn't the vulnerability it's a
+        legitimate Python feature. The vulnerability is deserializing
+        untrusted Pickle data where an attacker controls which callable gets
+        invoked.
+      </p>
+
+      <figure class="flex justify-center my-8">
+        <img src="/images/python-pickle/outro.gif" alt="" class="rounded-xl" width="500" />
+      </figure>
+
+      <p>
+        And that’s pretty much it! I hope you enjoyed the write-up and found
+        something useful in it. Have feedback? I’d love to hear it — reach out
+        any time.
+      </p>
+    </article>
+
+    <div class="mt-12 pt-8 border-t border-[#ffffff10] flex justify-between items-center">
+      <a
+        href="/#blogs"
+        class="inline-flex items-center gap-2 text-sm text-[var(--white-icon)] hover:text-white transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+          <path d="M7.82843 10.9999H20V12.9999H7.82843L13.1924 18.3638L11.7782 19.778L4 11.9999L11.7782 4.22168L13.1924 5.63589L7.82843 10.9999Z"></path>
+        </svg>
+        Back to blogs
+      </a>
+      <a
+        href="https://medium.com/@ahmed.gamal113296/python-pickle-when-cookies-execute-code-4b5a822a2b2e"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-2 text-sm text-[var(--sec)] hover:text-white transition-colors"
+      >
+        Read on Medium
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+          <path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z" />
+        </svg>
+      </a>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .writeup {
+    font-size: 1.05rem;
+    line-height: 1.8;
+    color: var(--white);
+  }
+
+  .writeup h2 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--white);
+    padding-top: 1.5rem;
+  }
+
+  .writeup strong {
+    color: #fff;
+  }
+
+  .writeup em {
+    color: var(--white-icon);
+  }
+
+  .writeup code {
+    background: #1414149c;
+    border: 1px solid var(--white-icon-tr);
+    border-radius: 0.4rem;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.85em;
+    color: var(--sec);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all;
+  }
+
+  .writeup pre {
+    background: #1414149c;
+    border: 1px solid var(--white-icon-tr);
+    border-radius: 1rem;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+
+  .writeup pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #dfdfdf;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    word-break: normal;
+  }
+
+  .writeup figure img {
+    display: block;
+  }
+</style>
