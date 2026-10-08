@@ -16,7 +16,7 @@ const SkillsList = () => {
   const [openItem, setOpenItem] = useState<string | null>(null);
 
   const skills = {
-    "Web Application Penetration Testing": [
+    "Web Penetration Testing": [
       "OWASP Top 10 vulnerabilities",
       "Business logic & access control flaws",
       "Authentication & Authorization testing",
@@ -28,7 +28,7 @@ const SkillsList = () => {
       "Vulnerability exploitation",
       "Privilege escalation & lateral movement",
     ],
-    "Mobile Application Penetration Testing": [
+    "Mobile Penetration Testing": [
       "Android application security testing",
       "Static & dynamic analysis",
       "API and network traffic analysis",
