@@ -35,7 +35,7 @@ const LikeButton = () => {
     : "border-[var(--white-icon)]";
 
   return (
-    <div className="flex items-center w-full">
+    <div className="flex items-center w-full -translate-x-1">
       <button
         onClick={handleLike}
         className={`
