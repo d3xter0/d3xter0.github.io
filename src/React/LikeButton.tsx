@@ -35,11 +35,11 @@ const LikeButton = () => {
     : "border-[var(--white-icon)]";
 
   return (
-    <div className="flex items-center">
+    <div className="flex items-center w-full">
       <button
         onClick={handleLike}
         className={`
-          group relative w-48 h-12 flex items-center justify-center p-3
+          group relative w-full h-12 flex items-center justify-center p-3
           rounded-full transition-all duration-300 ease-in-out transform border-2 ${borderColorClass}
           hover:scale-105 hover:border-[var(--white)]
           ${isAnimating ? "animate-heart-pulse" : ""}
