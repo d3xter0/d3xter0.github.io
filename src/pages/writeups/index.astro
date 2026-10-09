@@ -1,12 +1,14 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import Nav from "@/components/nav.astro";
-import Home from "@/components/home.astro";
+import Writeups from "@/components/writeups.astro";
 import Footer from "@/components/footer.astro";
 ---
 
-<Layout title="Ahmed">
+<Layout title="Writeups">
   <Nav />
-  <Home />
+  <main class="pt-16 md:pt-24">
+    <Writeups />
+  </main>
   <Footer />
 </Layout>

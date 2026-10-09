@@ -1,11 +1,13 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import Nav from "@/components/nav.astro";
 ---
 
 <Layout title="Python Pickle: When Cookies Execute Code">
+  <Nav />
   <main class="max-w-3xl mx-auto py-16 text-[var(--white)]">
     <a
-      href="/#blogs"
+      href="/blogs/"
       class="inline-flex items-center gap-2 text-sm text-[var(--white-icon)] hover:text-white transition-colors mb-8"
     >
       <svg
@@ -282,7 +284,7 @@ pickle.loads(payload)  # runs os.system(...) during unpickling</code></pre>
 
     <div class="mt-12 pt-8 border-t border-[#ffffff10] flex justify-between items-center">
       <a
-        href="/#blogs"
+        href="/blogs/"
         class="inline-flex items-center gap-2 text-sm text-[var(--white-icon)] hover:text-white transition-colors"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
