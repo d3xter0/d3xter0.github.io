@@ -5,10 +5,21 @@ const technologies = [
   "Metasploit",
   "Owasp",
   "Hashcat",
+  "Wireshark",
+  "Tor Browser",
+  "OpenVPN",
   "nodejs",
   "Python",
   "bash",
 ];
+
+const displayLabel = (tech: string) =>
+  tech === "OpenVPN"
+    ? tech
+    : tech
+        .split(" ")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
 ---
 
 <div class="relative overflow-x-hidden py-8">
@@ -32,7 +43,7 @@ const technologies = [
             decoding="async"
           />
           <span class="text-lg font-medium text-[var(--white-icon)] whitespace-nowrap">
-            {tech.charAt(0).toUpperCase() + tech.slice(1)}
+            {displayLabel(tech)}
           </span>
         </div>
       ))
