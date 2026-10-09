@@ -4,20 +4,32 @@ interface Props {
 }
 
 const { title } = Astro.props;
+
+const siteName = "Ahmed Gamal";
+const pageTitle =
+  title.toLowerCase() === "home"
+    ? "Ahmed Gamal | Penetration Tester & Security Researcher"
+    : `${title} | Ahmed Gamal`;
+
+const description =
+  "Ahmed Gamal - Penetration Tester and Bug Bounty Hunter specializing in web security, vulnerability research, CTF writeups, and offensive security.";
+
+const siteUrl = "https://d3xter0.github.io";
+const ogImage = `${siteUrl}/og-image.png`;
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>{title} Gamal</title>
-    <meta
-      name="description"
-      content="Ahmed - Penetration Tester focused on finding what others miss, from subtle logic flaws to complex vulnerabilities hidden deep within applications."
-    />
+    <title>{pageTitle}</title>
+
+    <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101010" />
+
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="canonical" href="https://darkminimal.vercel.app/" />
+    <link rel="canonical" href={siteUrl} />
 
     <link
       rel="preload"
@@ -27,43 +39,41 @@ const { title } = Astro.props;
       crossorigin="anonymous"
     />
 
-    <meta
-      property="og:title"
-      content="Ahmed | Penetration Tester"
-    />
-    <meta
-      property="og:description"
-      content="Portfolio of Ahmed, Penetration Tester & Bug Hunter"
-    />
-    <meta
-      property="og:image"
-      content="https://darkminimal.vercel.app/og.image.png"
-    />
-    <meta property="og:url" content="https://darkminimal.vercel.app" />
+    <!-- Open Graph: Discord, WhatsApp, LinkedIn, Facebook -->
     <meta property="og:type" content="website" />
-    <meta
-      property="og:site_name"
-      content="Ahmed Portfolio"
-    />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={siteUrl} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Ahmed Gamal — Penetration Tester & Security Researcher" />
+    <meta property="og:locale" content="en_US" />
 
-    <!-- Structured Data (JSON-LD) -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "Person",
-        "name": "Ahmed",
-        "alternateName": "Ahmed",
-        "url": "https://darkminimal.vercel.app",
-        "image": "https://darkminimal.vercel.app/og.image.png",
-        "sameAs": [
-          "https://github.com",
-          "https://linkedin.com"
-        ],
-        "jobTitle": "Penetration Tester",
-        "description": "Penetration Tester focused on finding vulnerabilities."
-      }
-    </script>
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "name": "Ahmed Gamal",
+      "alternateName": "Dexter",
+      "url": siteUrl,
+      "image": ogImage,
+      "sameAs": [
+        "https://github.com/d3xter0",
+        "https://www.linkedin.com/"
+      ],
+      "jobTitle": "Penetration Tester & Bug Bounty Hunter",
+      "description": description
+    })} />
   </head>
+
   <body class="bg-[--background] sm:px-28 lg:px-20 px-9">
     <slot />
   </body>
@@ -104,7 +114,6 @@ const { title } = Astro.props;
   }
 
   /* Scrollbar styles */
-
   ::-webkit-scrollbar {
     width: 15px;
   }
@@ -123,7 +132,7 @@ const { title } = Astro.props;
     background: var(--pink);
   }
 
-  /* Scrollbar styles for Firefox */
+  /* Firefox */
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--line) var(--container);
