@@ -1,0 +1,39 @@
+---
+const skills: { name: string; icon: string }[] = [
+  { name: "Burp Suite", icon: "/svg/Burp Suite.svg" },
+  { name: "Kali Linux", icon: "/svg/Kali Linux.svg" },
+  { name: "Metasploit", icon: "/svg/Metasploit.svg" },
+  { name: "Wireshark", icon: "/svg/wireshark.svg" },
+  { name: "Hashcat", icon: "/svg/Hashcat.svg" },
+  { name: "OWASP", icon: "/svg/Owasp.svg" },
+  { name: "Python", icon: "/svg/Python.svg" },
+  { name: "Bash", icon: "/svg/bash.svg" },
+  { name: "Node.js", icon: "/svg/nodejs.svg" },
+  { name: "Git", icon: "/svg/git.svg" },
+  { name: "Tor Browser", icon: "/svg/Tor Browser.svg" },
+  { name: "OpenVPN", icon: "/svg/OpenVPN.svg" },
+];
+---
+
+<div class="pt-4 md:pt-12 border-t border-[#ffffff10]">
+  <h3 class="text-lg text-[var(--sec)] mb-2 shiny-sec">Tools I work with</h3>
+  <h4 class="text-3xl md:text-4xl font-medium text-[var(--white)] mb-6">
+    Skills
+  </h4>
+  <div class="flex flex-wrap gap-3">
+    {
+      skills.map((skill) => (
+        <div class="flex items-center gap-2.5 px-4 py-2.5 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[var(--white-icon)] hover:text-[var(--white)] hover:border-[var(--white-icon)] hover:scale-105 transition-all duration-300 ease-in-out cursor-default">
+          <img
+            src={skill.icon}
+            alt={skill.name}
+            class="h-5 w-5 object-contain"
+            loading="lazy"
+            decoding="async"
+          />
+          <span class="text-sm font-medium">{skill.name}</span>
+        </div>
+      ))
+    }
+  </div>
+</div>

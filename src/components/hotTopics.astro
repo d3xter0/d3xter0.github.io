@@ -1,0 +1,95 @@
+---
+interface Topic {
+  type: string;
+  typeColor: string;
+  title: string;
+  desc: string;
+  image: string;
+  link: string;
+}
+
+const topics: Topic[] = [
+  {
+    type: "Writeup",
+    typeColor: "text-[#A9FF5B]",
+    title: "CCTV — HTB Machine",
+    desc: "From a vulnerable ZoneMinder instance to root: command injection via CVE-2022–29254, then privilege escalation with a misconfigured capability.",
+    image: "/images/cctv/cover.png",
+    link: "/writeups/cctv/",
+  },
+  {
+    type: "Blog",
+    typeColor: "text-[var(--sec)]",
+    title: "Python Pickle: When Cookies Execute Code",
+    desc: "A session cookie that turned out to be a serialized Python object — and how untrusted deserialization leads straight to code execution.",
+    image: "/images/python-pickle/intro.gif",
+    link: "/blogs/python-pickle/",
+  },
+];
+---
+
+<div class="pt-4 md:pt-12 border-t border-[#ffffff10]">
+  <h3 class="text-lg text-[var(--sec)] mb-2 shiny-sec">Featured</h3>
+  <h4 class="text-3xl md:text-4xl font-medium text-[var(--white)] mb-6">
+    Hot Topics
+  </h4>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    {
+      topics.map((topic) => (
+        <a
+          href={topic.link}
+          class="group rounded-2xl p-6 border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] hover:bg-[var(--white-icon-tr)] transition duration-300 ease-in-out flex items-center gap-5"
+        >
+          <div class="flex-grow min-w-0">
+            <span class={`text-sm font-medium ${topic.typeColor}`}>
+              {topic.type}
+            </span>
+            <h5 class="text-xl font-semibold text-[var(--white)] mt-1 mb-2 group-hover:text-white transition-colors">
+              {topic.title}
+            </h5>
+            <p class="text-sm text-[var(--white-icon)]">{topic.desc}</p>
+          </div>
+          <img
+            src={topic.image}
+            alt={topic.title}
+            class="hidden sm:block w-24 h-24 lg:w-28 lg:h-28 object-cover rounded-xl border border-1 border-[var(--white-icon-tr)] flex-shrink-0"
+            loading="lazy"
+            decoding="async"
+          />
+        </a>
+      ))
+    }
+  </div>
+
+  <div class="flex flex-col sm:flex-row justify-center gap-4 mt-8">
+    <a
+      href="/writeups/"
+      class="flex items-center justify-center gap-2 px-6 py-3 rounded-full text-sm text-[var(--white-icon)] hover:text-white transition duration-300 ease-in-out border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] hover:bg-[var(--white-icon-tr)] hover:scale-105"
+    >
+      View all writeups
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        class="size-4"
+      >
+        <path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z" />
+      </svg>
+    </a>
+    <a
+      href="/blogs/"
+      class="flex items-center justify-center gap-2 px-6 py-3 rounded-full text-sm text-[var(--white-icon)] hover:text-white transition duration-300 ease-in-out border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] hover:bg-[var(--white-icon-tr)] hover:scale-105"
+    >
+      View all Blogs
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        class="size-4"
+      >
+        <path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z" />
+      </svg>
+    </a>
+  </div>
+</div>
