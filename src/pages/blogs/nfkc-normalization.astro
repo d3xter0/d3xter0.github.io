@@ -3,7 +3,7 @@ import Layout from "@/layouts/Layout.astro";
 import Nav from "@/components/nav.astro";
 ---
 
-<Layout title="NFKC Normalization: When Ａ Becomes A">
+<Layout title="NFKC Normalization: Where Sanitization Fails">
   <Nav />
   <main class="max-w-3xl mx-auto pt-28 md:pt-32 pb-16 text-[var(--white)]">
     <a
@@ -43,7 +43,7 @@ import Nav from "@/components/nav.astro";
         <span class="text-[var(--white-icon)]">Nov 11, 2026</span>
       </div>
       <h1 class="text-4xl md:text-5xl font-semibold mb-3">
-        NFKC Normalization: When Ａ Becomes A
+        NFKC Normalization: Where Sanitization Fails
       </h1>
       <p class="text-[var(--white-icon)]">
         Two strings can look identical, compare differently, and still end up as
@@ -69,10 +69,10 @@ import Nav from "@/components/nav.astro";
 
     <article class="writeup space-y-5">
       <div class="callout">
-        <span class="callout__label">TL;DR</span>
+        <span class="callout__label">Nutshell</span>
         <p>
           NFKC folds <strong>compatibility characters</strong> into their
-          standard form — fullwidth Ａ becomes A, ① becomes 1, and ／ becomes /.
+          standard form, fullwidth Ａ becomes A, ① becomes 1, and ／ becomes /.
           If one component validates the raw input while another processes the
           normalized input, the check and the action can disagree.
         </p>
@@ -128,7 +128,7 @@ import Nav from "@/components/nav.astro";
         <code>A</code> (<span class="cp">U+0041</span>) and <code>Ａ</code>
         (<span class="cp">U+FF21</span>) look almost the same, but they are
         different code points. To a string comparison, they are different
-        characters — even though a human would call them the same letter.
+        characters even though a human would call them the same letter.
       </p>
 
       <h2>Normalization: same character, different bytes</h2>
@@ -172,7 +172,7 @@ import Nav from "@/components/nav.astro";
       <p>
         NFKC stands for <strong>Normalization Form Compatibility Composition</strong>.
         On top of canonical equivalence, it also applies <strong>compatibility
-        mappings</strong> — formatting variants, ligatures, circled characters,
+        mappings</strong> formatting variants, ligatures, circled characters,
         superscripts, fullwidth forms.
       </p>
 
@@ -232,7 +232,7 @@ print(payload)     # Ａ①²ﬁ
 print(normalized)  # A12fi</code></pre>
 
       <p>
-        NFC and NFD preserve compatibility distinctions. NFKC and NFKD do not —
+        NFC and NFD preserve compatibility distinctions. NFKC and NFKD do not,
         they deliberately collapse them. That is the feature. It is also the
         risk.
       </p>
@@ -268,7 +268,7 @@ print(unicodedata.normalize("NFKC", payload))       # /etc/passwd</code></pre>
         <span class="callout__label">Important</span>
         <p>
           This is a primitive, not a complete path traversal. It matters when
-          the normalized value reaches a sink — a filesystem call, a query, a
+          the normalized value reaches a sink, a filesystem call, a query, a
           shell, a template, or an access-control decision.
         </p>
       </div>
@@ -350,7 +350,7 @@ print(unicodedata.normalize("NFKC", payload))       # /etc/passwd</code></pre>
 
       <p>
         If the uniqueness check looks at the raw value but authentication looks
-        up the normalized value — or vice versa — two different accounts can map
+        up the normalized value or vice versa, two different accounts can map
         to the same identifier. Depending on the order of the checks, that is
         either a collision, a broken login, or a very bad day.
       </p>
