@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1200" width="1200" height="1200" role="img" aria-labelledby="title desc">
+  <title id="title">NFKC Normalization cover</title>
+  <desc id="desc">The fullwidth letter A in its em box normalizes to the narrower ASCII letter A.</desc>
+
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="44%" r="55%">
+      <stop offset="0%" stop-color="#a476ff" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#a476ff" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#ffffff" stroke-opacity="0.045" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="1200" fill="#101010"/>
+  <rect width="1200" height="1200" fill="url(#grid)"/>
+  <rect width="1200" height="1200" fill="url(#glow)"/>
+
+  <g font-family="Montserrat, Arial, Helvetica, sans-serif">
+    <text x="84" y="150" fill="#a476ff" font-size="96" font-weight="700" letter-spacing="2">NFKC</text>
+    <text x="88" y="212" fill="#f3f3f398" font-size="26" font-weight="500" letter-spacing="7">UNICODE NORMALIZATION</text>
+  </g>
+
+  <g font-family="Montserrat, Arial, Helvetica, sans-serif" text-anchor="middle">
+    <rect x="170" y="380" width="280" height="340" rx="28" fill="#141414" fill-opacity="0.6" stroke="#ffffff" stroke-opacity="0.12"/>
+    <text x="310" y="642" fill="#dfdfdf" font-size="240" font-weight="600">Ａ</text>
+    <text x="310" y="800" fill="#f3f3f398" font-size="30" letter-spacing="4">U+FF21</text>
+
+    <text x="600" y="600" fill="#a476ff" font-size="112">→</text>
+
+    <rect x="750" y="380" width="280" height="340" rx="28" fill="#141414" fill-opacity="0.6" stroke="#a476ff" stroke-opacity="0.45"/>
+    <text x="890" y="642" fill="#a476ff" font-size="240" font-weight="600">A</text>
+    <text x="890" y="800" fill="#f3f3f398" font-size="30" letter-spacing="4">U+0041</text>
+  </g>
+
+  <text x="600" y="1030" fill="#f3f3f398" font-family="Montserrat, Arial, Helvetica, sans-serif" font-size="34" letter-spacing="3" text-anchor="middle">SAME CHARACTER. DIFFERENT BYTES.</text>
+</svg>

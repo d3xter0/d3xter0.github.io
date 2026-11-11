@@ -1,0 +1,724 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Nav from "@/components/nav.astro";
+---
+
+<Layout title="NFKC Normalization: When Ａ Becomes A">
+  <Nav />
+  <main class="max-w-3xl mx-auto pt-28 md:pt-32 pb-16 text-[var(--white)]">
+    <a
+      href="/blogs/"
+      class="inline-flex items-center gap-2 text-sm text-[var(--white-icon)] hover:text-white transition-colors mb-8"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        class="size-4"
+      >
+        <path
+          d="M7.82843 10.9999H20V12.9999H7.82843L13.1924 18.3638L11.7782 19.778L4 11.9999L11.7782 4.22168L13.1924 5.63589L7.82843 10.9999Z"
+        ></path>
+      </svg>
+      Back to blogs
+    </a>
+
+    <header class="mb-10">
+      <div class="flex flex-wrap items-center gap-3 mb-3 text-sm">
+        <span
+          class="px-3 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[var(--sec)]"
+        >
+          Unicode
+        </span>
+        <span
+          class="px-3 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[var(--white-icon)]"
+        >
+          Python
+        </span>
+        <span
+          class="px-3 py-1 rounded-full border border-1 border-[var(--white-icon-tr)] bg-[#1414149c] text-[var(--white-icon)]"
+        >
+          Web Security
+        </span>
+        <span class="text-[var(--white-icon)]">Nov 11, 2026</span>
+      </div>
+      <h1 class="text-4xl md:text-5xl font-semibold mb-3">
+        NFKC Normalization: When Ａ Becomes A
+      </h1>
+      <p class="text-[var(--white-icon)]">
+        Two strings can look identical, compare differently, and still end up as
+        the same value after normalization. That gap is where the interesting
+        bugs live.
+      </p>
+
+      <div
+        class="transform"
+        aria-label="The fullwidth letter A, U+FF21, normalizes to the ASCII letter A, U+0041"
+      >
+        <div class="transform__side">
+          <span class="transform__char">Ａ</span>
+          <span class="transform__meta">U+FF21 · fullwidth</span>
+        </div>
+        <div class="transform__arrow" aria-hidden="true">→</div>
+        <div class="transform__side transform__side--out">
+          <span class="transform__char transform__char--accent">A</span>
+          <span class="transform__meta">U+0041 · ASCII</span>
+        </div>
+      </div>
+    </header>
+
+    <article class="writeup space-y-5">
+      <div class="callout">
+        <span class="callout__label">TL;DR</span>
+        <p>
+          NFKC folds <strong>compatibility characters</strong> into their
+          standard form — fullwidth Ａ becomes A, ① becomes 1, and ／ becomes /.
+          If one component validates the raw input while another processes the
+          normalized input, the check and the action can disagree.
+        </p>
+      </div>
+
+      <h2>Unicode in 60 seconds</h2>
+      <p>
+        Unicode assigns every character a number called a <strong>code point</strong>.
+        Most of the time this is invisible, until two strings look the same but
+        are not the same:
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Character</th>
+              <th>Code point</th>
+              <th>Name</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>A</code></td>
+              <td><code>U+0041</code></td>
+              <td>Latin capital letter A</td>
+            </tr>
+            <tr>
+              <td><code>a</code></td>
+              <td><code>U+0061</code></td>
+              <td>Latin small letter a</td>
+            </tr>
+            <tr>
+              <td><code>①</code></td>
+              <td><code>U+2460</code></td>
+              <td>Circled digit one</td>
+            </tr>
+            <tr>
+              <td><code>²</code></td>
+              <td><code>U+00B2</code></td>
+              <td>Superscript two</td>
+            </tr>
+            <tr>
+              <td><code>Ａ</code></td>
+              <td><code>U+FF21</code></td>
+              <td>Fullwidth Latin capital letter A</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        <code>A</code> (<span class="cp">U+0041</span>) and <code>Ａ</code>
+        (<span class="cp">U+FF21</span>) look almost the same, but they are
+        different code points. To a string comparison, they are different
+        characters — even though a human would call them the same letter.
+      </p>
+
+      <h2>Normalization: same character, different bytes</h2>
+      <p>
+        Unicode normalization turns equivalent representations into a
+        consistent one. The classic example is <code>é</code>, which can be
+        stored in two ways:
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Input</th>
+              <th>Code points</th>
+              <th>After NFC</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>é</code> (precomposed)</td>
+              <td><code>U+00E9</code></td>
+              <td><code>U+00E9</code></td>
+            </tr>
+            <tr>
+              <td><code>e</code> + combining acute</td>
+              <td><code>U+0065 U+0301</code></td>
+              <td><code>U+00E9</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        Both inputs display as the same character, and both normalize to the
+        same code point. This is <strong>canonical equivalence</strong>: a
+        difference in encoding, not in meaning.
+      </p>
+
+      <h2>NFKC: compatibility counts too</h2>
+      <p>
+        NFKC stands for <strong>Normalization Form Compatibility Composition</strong>.
+        On top of canonical equivalence, it also applies <strong>compatibility
+        mappings</strong> — formatting variants, ligatures, circled characters,
+        superscripts, fullwidth forms.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Input</th>
+              <th>Code point</th>
+              <th>NFKC result</th>
+              <th>Why</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>Ａ</code></td>
+              <td><code>U+FF21</code></td>
+              <td><code>A</code></td>
+              <td>Fullwidth form</td>
+            </tr>
+            <tr>
+              <td><code>①</code></td>
+              <td><code>U+2460</code></td>
+              <td><code>1</code></td>
+              <td>Circled digit</td>
+            </tr>
+            <tr>
+              <td><code>²</code></td>
+              <td><code>U+00B2</code></td>
+              <td><code>2</code></td>
+              <td>Superscript</td>
+            </tr>
+            <tr>
+              <td><code>ﬁ</code></td>
+              <td><code>U+FB01</code></td>
+              <td><code>fi</code></td>
+              <td>Ligature</td>
+            </tr>
+            <tr>
+              <td><code>／</code></td>
+              <td><code>U+FF0F</code></td>
+              <td><code>/</code></td>
+              <td>Fullwidth solidus</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Python ships the whole normalization family in <code>unicodedata</code>:</p>
+
+      <pre><code>import unicodedata
+
+payload = "Ａ①²ﬁ"
+normalized = unicodedata.normalize("NFKC", payload)
+
+print(payload)     # Ａ①²ﬁ
+print(normalized)  # A12fi</code></pre>
+
+      <p>
+        NFC and NFD preserve compatibility distinctions. NFKC and NFKD do not —
+        they deliberately collapse them. That is the feature. It is also the
+        risk.
+      </p>
+
+      <h2>Where it bites</h2>
+      <p>
+        NFKC is not a vulnerability by itself. The bug appears when two parts of
+        a system disagree about <em>which form is canonical</em>: one validates
+        the input as received, the other processes it after normalization.
+      </p>
+
+      <h3>1. Validation bypass</h3>
+      <p>
+        Imagine a validator that blocks forward slashes to keep user-controlled
+        paths in check:
+      </p>
+
+      <pre><code>def validate_input(value):
+    return "/" not in value</code></pre>
+
+      <p>
+        The fullwidth solidus <code>／</code>
+        (<span class="cp">U+FF0F</span>) is not a forward slash, so it passes.
+        Then the value is normalized:
+      </p>
+
+      <pre><code>payload = "／etc/passwd"
+
+print(validate_input(payload))                      # True
+print(unicodedata.normalize("NFKC", payload))       # /etc/passwd</code></pre>
+
+      <div class="callout callout--note">
+        <span class="callout__label">Important</span>
+        <p>
+          This is a primitive, not a complete path traversal. It matters when
+          the normalized value reaches a sink — a filesystem call, a query, a
+          shell, a template, or an access-control decision.
+        </p>
+      </div>
+
+      <p>The dangerous pattern looks like this:</p>
+
+      <pre><code>if validate_input(user_input):
+    process(unicodedata.normalize("NFKC", user_input))</code></pre>
+
+      <p>
+        The validator inspected one string. The rest of the application acted on
+        another.
+      </p>
+
+      <h3>2. WAF sees one thing, the backend sees another</h3>
+      <p>
+        The same mismatch scales up to a Web Application Firewall. The WAF
+        inspects the request as it arrived; the backend may normalize later.
+      </p>
+
+      <div class="flow">
+        <div class="flow__step">
+          <span>01 · Request</span>
+          <strong>Attacker sends</strong>
+          <code>／etc/passwd</code>
+          <small class="flow__meta">U+FF0F before “etc/passwd”</small>
+        </div>
+        <div class="flow__arrow" aria-hidden="true">→</div>
+        <div class="flow__step">
+          <span>02 · Inspect</span>
+          <strong>WAF sees</strong>
+          <code>／</code>
+          <small class="flow__meta">not ASCII “/”</small>
+        </div>
+        <div class="flow__arrow" aria-hidden="true">→</div>
+        <div class="flow__step flow__step--accent">
+          <span>03 · Process</span>
+          <strong>Backend sees</strong>
+          <code>/etc/passwd</code>
+          <small class="flow__meta">after NFKC</small>
+        </div>
+      </div>
+
+      <p>
+        This does not mean "NFKC bypasses WAFs." It depends on how the WAF
+        handles Unicode, how the framework normalizes, and the order in which
+        each layer runs. The testable question is whether those layers agree.
+      </p>
+
+      <h3>3. Username collisions</h3>
+      <p>
+        Now consider registration and login. These two usernames are different
+        strings:
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Code points</th>
+              <th>NFKC</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>admin</code></td>
+              <td><code>U+0061 U+0064 U+006D U+0069 U+006E</code></td>
+              <td><code>admin</code></td>
+            </tr>
+            <tr>
+              <td><code>ａｄｍｉｎ</code></td>
+              <td><code>U+FF41 U+FF44 U+FF4D U+FF49 U+FF4E</code></td>
+              <td><code>admin</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        If the uniqueness check looks at the raw value but authentication looks
+        up the normalized value — or vice versa — two different accounts can map
+        to the same identifier. Depending on the order of the checks, that is
+        either a collision, a broken login, or a very bad day.
+      </p>
+
+      <p>
+        Python makes this especially visible because the parser applies NFKC to
+        identifiers (PEP 3131). Fullwidth names are not separate names:
+      </p>
+
+      <pre><code>ａｄｍｉｎ = 42
+print(admin)  # 42</code></pre>
+
+      <h2>How to defend</h2>
+      <p>
+        Pick one normalization policy and apply it at the boundary, before any
+        validation or uniqueness check. Then keep using that same value.
+      </p>
+
+      <pre><code>import unicodedata
+
+def normalize_username(value: str) -&gt; str:
+    value = unicodedata.normalize("NFKC", value)
+    if not value.isascii() or not value.isalnum():
+        raise ValueError("invalid username")
+    return value.lower()</code></pre>
+
+      <ul>
+        <li><strong>Normalize first, validate second.</strong> Validating the raw input creates the gap.</li>
+        <li><strong>Store the normalized form.</strong> Apply the same transform to uniqueness checks, login lookups, and authorization decisions.</li>
+        <li><strong>Decide per field.</strong> A username policy is not automatically a password policy. Normalizing arbitrary content can change its meaning.</li>
+        <li><strong>Keep other layers aligned.</strong> Database collation, case folding, and confusable-character checks are separate decisions, not substitutes for normalization.</li>
+      </ul>
+
+      <h2>Takeaway</h2>
+      <p>
+        Unicode normalization is a consistency problem before it is a security
+        problem. NFKC is simply the form that makes the gap easiest to reach:
+        it turns lookalike input into ordinary ASCII.
+      </p>
+
+      <p>
+        So the next time an application validates one string and processes
+        another, try this:
+      </p>
+
+      <pre><code>import unicodedata
+
+for char in "ｐａｙｌｏａｄ／①":
+    normalized = unicodedata.normalize("NFKC", char)
+    if char != normalized:
+        print(f"U+&#123;ord(char):04X&#125; &#123;char!r&#125; -&gt; &#123;normalized!r&#125;")</code></pre>
+
+      <p>
+        If the filter sees something different from the sink, you have found the
+        seam. That is where the bug is.
+      </p>
+    </article>
+
+    <div class="mt-12 pt-8 border-t border-[#ffffff10] flex justify-between items-center">
+      <a
+        href="/blogs/"
+        class="inline-flex items-center gap-2 text-sm text-[var(--white-icon)] hover:text-white transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4">
+          <path
+            d="M7.82843 10.9999H20V12.9999H7.82843L13.1924 18.3638L11.7782 19.778L4 11.9999L11.7782 4.22168L13.1924 5.63589L7.82843 10.9999Z"
+          ></path>
+        </svg>
+        Back to blogs
+      </a>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .writeup {
+    font-size: 1.05rem;
+    line-height: 1.8;
+    color: var(--white);
+  }
+
+  .writeup h2 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--white);
+    padding-top: 1.5rem;
+  }
+
+  .writeup h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--white);
+    padding-top: 0.75rem;
+  }
+
+  .writeup strong {
+    color: #fff;
+  }
+
+  .writeup em {
+    color: var(--white-icon);
+  }
+
+  .writeup code {
+    background: #1414149c;
+    border: 1px solid var(--white-icon-tr);
+    border-radius: 0.4rem;
+    padding: 0.08rem 0.3rem;
+    font-size: 0.85em;
+    color: var(--sec);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all;
+  }
+
+  .writeup .cp {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82em;
+    color: var(--sec);
+    white-space: nowrap;
+  }
+
+  .writeup pre {
+    background: #1414149c;
+    border: 1px solid var(--white-icon-tr);
+    border-radius: 1rem;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+  }
+
+  .writeup pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #dfdfdf;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    word-break: normal;
+  }
+
+  .writeup ul {
+    list-style: disc;
+    padding-left: 1.25rem;
+  }
+
+  .writeup li {
+    margin-bottom: 0.4rem;
+  }
+
+  .writeup li::marker {
+    color: var(--sec);
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    margin: 1.25rem 0;
+  }
+
+  .writeup table {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+
+  .writeup th,
+  .writeup td {
+    border-bottom: 1px solid var(--white-icon-tr);
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .writeup th {
+    color: var(--white);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .writeup td {
+    color: var(--white-icon);
+  }
+
+  .writeup td code {
+    word-break: normal;
+    white-space: nowrap;
+  }
+
+  .transform {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .transform__side {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 9.5rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--white-icon-tr);
+    border-radius: 1rem;
+    background: #1414149c;
+  }
+
+  .transform__char {
+    font-size: 3.25rem;
+    line-height: 1;
+    color: var(--white);
+  }
+
+  .transform__char--accent {
+    color: var(--sec);
+  }
+
+  .transform__meta {
+    color: var(--white-icon);
+    font-size: 0.68rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .transform__arrow {
+    color: var(--sec);
+    font-size: 1.4rem;
+  }
+
+  @media (max-width: 480px) {
+    .transform {
+      gap: 0.5rem;
+    }
+
+    .transform__side {
+      flex: 1;
+      min-width: 0;
+      padding: 0.9rem 0.5rem;
+    }
+
+    .transform__char {
+      font-size: 2.5rem;
+    }
+
+    .transform__meta {
+      font-size: 0.6rem;
+      letter-spacing: 0;
+      text-align: center;
+    }
+  }
+
+  .callout {
+    border: 1px solid var(--white-icon-tr);
+    border-left: 3px solid var(--sec);
+    background: #1414149c;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+  }
+
+  .callout__label {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: var(--sec);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .callout p {
+    margin: 0;
+  }
+
+  .callout--note {
+    border-left-color: var(--white-icon);
+  }
+
+  .callout--note .callout__label {
+    color: var(--white);
+  }
+
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+    margin: 1.5rem 0;
+  }
+
+  .flow__step {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--white-icon-tr);
+    background: #1414149c;
+    border-radius: 0.75rem;
+    padding: 0.9rem;
+  }
+
+  .flow__step span {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: var(--white-icon);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .flow__step strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+  }
+
+  .flow__step code {
+    display: inline-block;
+    font-size: 0.8rem;
+    word-break: normal;
+  }
+
+  .flow__meta {
+    display: block;
+    margin-top: 0.5rem;
+    color: var(--white-icon);
+    font-size: 0.68rem;
+    line-height: 1.4;
+  }
+
+  .flow__step--accent {
+    border-color: color-mix(in srgb, var(--sec) 45%, transparent);
+  }
+
+  .flow__arrow {
+    align-self: center;
+    color: var(--sec);
+    font-size: 1.1rem;
+  }
+
+  @media (max-width: 640px) {
+    .writeup table {
+      min-width: 0;
+      font-size: 0.8rem;
+    }
+
+    .writeup th,
+    .writeup td {
+      padding: 0.5rem 0.35rem;
+    }
+
+    .writeup th {
+      font-size: 0.68rem;
+      letter-spacing: 0.03em;
+    }
+
+    .writeup td code {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .flow {
+      flex-direction: column;
+    }
+
+    .flow__arrow {
+      transform: rotate(90deg);
+      text-align: center;
+    }
+  }
+</style>
